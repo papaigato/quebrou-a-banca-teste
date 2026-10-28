@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quebra-Banca & Feed Seguro — Protótipo</title>
+
+<!-- Dependências externas permitidas (CDN) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ===== Design tokens (cromoterapia) ===== */
+:root{
+  --bg:#0F172A; --surface:#1E293B; --border:#334155;
+  --text:#E2E8F0; --muted:#94A3B8;
+  --ok:#10B981; --ok-t:#34D399;
+  --warn:#F59E0B; --warn-t:#FBBF24;
+  --err:#EF4444; --err-t:#F87171;
+  --on-fill:#04130D;
+}
+/* Alto contraste estrito (WCAG AAA) */
+html.hc{
+  --bg:#000000; --surface:#000000; --border:#FFFFFF;
+  --text:#FFFFFF; --muted:#FFFFFF;
+  --ok:#00FF7F; --ok-t:#00FF7F; --warn:#FFD400; --warn-t:#FFD400;
+  --err:#FF6B6B; --err-t:#FF6B6B; --on-fill:#000000;
+}
+html.hc .card, html.hc button, html.hc input, html.hc textarea{ border:2px solid #FFF !important; }
+/* Daltonismo (paleta Okabe-Ito) */
+html.cb{
+  --ok:#0072B2; --ok-t:#56B4E9; --warn:#E69F00; --warn-t:#E69F00;
+  --err:#D55E00; --err-t:#E69F00; --on-fill:#FFFFFF;
+}
+/* Ícones semânticos explícitos: só aparecem no modo daltonismo */
+.sem{display:none;font-weight:800}
+html.cb .sem{display:inline}
+
+html{font-size:16px}
+html.big{font-size:20px} /* +25% em rem */
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Plus Jakarta Sans',system-ui,sans-serif;
+  padding-top:5.6rem;padding-bottom:5.5rem;
+}
+.mono{font-family:'JetBrains Mono',monospace}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:1rem;padding:1rem}
+.muted{color:var(--muted)}
+.t-ok{color:var(--ok-t)} .t-warn{color:var(--warn-t)} .t-err{color:var(--err-t)}
+.btn{border-radius:.85rem;padding:.75rem 1rem;font-weight:700;cursor:pointer;transition:transform .1s, filter .2s;min-height:44px}
+.btn:active{transform:scale(.97)}
+.btn:focus-visible,.chip:focus-visible,.navbtn:focus-visible{outline:3px solid var(--warn);outline-offset:2px}
+.btn-ok{background:var(--ok);color:var(--on-fill)}
+.btn-warn{background:var(--warn);color:#1a1100}
+html.hc .btn-warn{color:#000}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-err{background:var(--err);color:#fff}
+html.hc .btn-err{color:#000}
+.chip{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:999px;padding:.55rem 1rem;font-weight:700;cursor:pointer;min-height:44px}
+.chip[aria-pressed="true"]{background:var(--ok);color:var(--on-fill);border-color:var(--ok)}
+
+/* Barras fixas */
+#a11y{position:fixed;top:0;left:0;right:0;z-index:60;background:#020617;border-bottom:1px solid var(--border);
+  display:flex;gap:.5rem;align-items:center;justify-content:center;padding:.4rem}
+html.hc #a11y{background:#000}
+#a11y button{min-width:44px;min-height:40px;border-radius:.6rem;border:1px solid var(--border);background:var(--surface);color:var(--text);font-weight:800;cursor:pointer}
+#a11y button[aria-pressed="true"]{background:var(--warn);color:#000}
+#sos{position:fixed;top:3rem;left:0;right:0;z-index:55;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;gap:.5rem;align-items:center;justify-content:space-between;padding:.35rem .75rem;font-size:.72rem}
+#sos a{background:var(--err);color:#fff;border-radius:.5rem;padding:.3rem .6rem;font-weight:800;text-decoration:none;white-space:nowrap}
+html.hc #sos a{color:#000}
+
+/* Bottom nav */
+#nav{position:fixed;bottom:0;left:0;right:0;z-index:60;background:#020617;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(5,1fr)}
+html.hc #nav{background:#000}
+.navbtn{padding:.5rem .1rem;font-size:.68rem;font-weight:700;color:var(--muted);background:none;border:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.1rem;min-height:56px}
+.navbtn .ic{font-size:1.25rem}
+.navbtn[aria-current="page"]{color:var(--ok-t);box-shadow:inset 0 3px 0 var(--ok)}
+.wrap{max-width:640px;margin:0 auto;padding:0 1rem}
+.screen[hidden]{display:none}
+h2{font-weight:800;font-size:1.3rem}
+
+/* Tela 1 — post com filtro óptico */
+.post{position:relative;overflow:hidden;border-radius:1rem;border:1px solid var(--border);background:var(--surface)}
+.post .overlay{position:absolute;inset:0;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(15,23,42,.55);
+  display:flex;align-items:center;justify-content:center;padding:1rem;text-align:center;transition:opacity .3s}
+.post.revealed .overlay{opacity:0;pointer-events:none}
+html.hc .post .overlay{background:rgba(0,0,0,.85)}
+.bar{background:var(--ok);border-radius:.4rem .4rem 0 0;transition:height .8s}
+
+/* Tela 2 — glitch 600ms */
+@keyframes glitch{
+  0%{transform:translate(0);text-shadow:none;filter:none}
+  15%{transform:translate(-4px,2px) skewX(6deg);text-shadow:3px 0 var(--err),-3px 0 var(--ok)}
+  30%{transform:translate(5px,-3px) skewX(-8deg);filter:hue-rotate(60deg)}
+  50%{transform:translate(-3px,0);text-shadow:-3px 0 var(--err),3px 0 var(--warn)}
+  70%{transform:translate(4px,2px) skewX(5deg);filter:contrast(1.6)}
+  100%{transform:translate(0);text-shadow:none;filter:none}
+}
+.glitching{animation:glitch .6s steps(8) 1}
+@keyframes pulseGlow{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.6)}50%{box-shadow:0 0 0 16px rgba(16,185,129,0)}}
+.pulse{animation:pulseGlow 1.6s infinite}
+@media (prefers-reduced-motion:reduce){.pulse,.glitching{animation:none}}
+
+/* Tela 4 — foguete */
+#track{position:relative;height:260px;border-radius:1rem;border:1px solid var(--border);overflow:hidden;
+  background:linear-gradient(to top,#0b3b2e 0%,var(--bg) 100%)}
+html.hc #track{background:#000}
+#rocket{position:absolute;left:50%;transform:translateX(-50%);font-size:2.4rem;bottom:0;transition:none}
+#holdBtn{touch-action:none;user-select:none;-webkit-user-select:none}
+
+/* Tela 5 — chat e respiração */
+.bubble{max-width:85%;padding:.6rem .85rem;border-radius:1rem;font-size:.92rem;line-height:1.4;white-space:pre-wrap}
+.b-bot{background:var(--surface);border:1px solid var(--border);align-self:flex-start}
+.b-me{background:var(--ok);color:var(--on-fill);align-self:flex-end}
+#breathCircle{width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,var(--ok),transparent 70%);
+  border:3px solid var(--ok);display:flex;align-items:center;justify-content:center;font-weight:800;margin:1rem auto;
+  transition:transform 4s ease-in-out}
+
+/* Modal e toast */
+#modal{position:fixed;inset:0;z-index:80;background:rgba(2,6,23,.8);display:flex;align-items:center;justify-content:center;padding:1rem}
+#modal[hidden]{display:none}
+#toast{position:fixed;left:50%;bottom:6rem;transform:translateX(-50%);z-index:90;background:var(--ok);color:var(--on-fill);
+  padding:.6rem 1rem;border-radius:.8rem;font-weight:700;font-size:.85rem;opacity:0;pointer-events:none;transition:opacity .3s;max-width:90%;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+
+<body>
+
+<!-- ===== Barra fixa de acessibilidade ===== -->
+<div id="a11y" role="toolbar" aria-label="Acessibilidade">
+  <button id="btnFont" aria-pressed="false" aria-label="Aumentar texto em 25%" title="Aumentar texto">A+</button>
+  <button id="btnContrast" aria-pressed="false" aria-label="Alto contraste" title="Alto contraste">◐</button>
+  <button id="btnColor" aria-pressed="false" aria-label="Modo daltonismo" title="Modo daltonismo">👁️</button>
+  <button id="btnVoice" aria-pressed="false" aria-label="Ler tela em voz alta" title="Leitor de voz">🔊</button>
+</div>
+
+<!-- ===== Faixa permanente de apoio ===== -->
+<div id="sos">
+  <span><strong>Apoio complementar:</strong> esta ferramenta não substitui atendimento profissional.</span>
+  <span class="flex gap-1">
+    <a href="tel:188" aria-label="Ligar para o CVV 188">📞 CVV 188</a>
+    <a href="tel:136" aria-label="Disque Saúde 136 — encontre o CAPS">CAPS/SUS</a>
+  </span>
+</div>
+
+<main class="wrap">
+
+<!-- ================= TELA 1 — FEED SEGURO ================= -->
+<section id="s1" class="screen space-y-4" aria-labelledby="h1">
+  <h2 id="h1">🛡️ Feed Seguro</h2>
+  <p class="muted text-sm">Seu escudo diário: o filtro desfoca postagens que usam gatilhos de manipulação.</p>
+
+  <article class="post" id="post1">
+    <div class="p-4">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="rounded-full w-9 h-9 flex items-center justify-center" style="background:var(--warn);color:#000">R</div>
+        <div><strong>@ReiDoGreen_Oficial</strong><div class="muted text-xs">Patrocinado · perfil fictício</div></div>
+      </div>
+      <p class="text-lg font-bold">🔥 FALHA NO ALGORITMO HOJE ÀS 22H!</p>
+      <p class="text-sm mt-1">+3.200 seguidores já lucraram. Entra no grupo VIP antes que feche! 💰💰</p>
+    </div>
+    <div class="overlay">
+      <div class="card" style="max-width:340px">
+        <p class="font-extrabold t-ok">🛡️ Gatilho de Ilusão Interceptado</p>
+        <p class="text-sm mt-1">Este post usa <strong>Falsa Prova Social (CPA)</strong>.</p>
+        <div class="flex gap-2 mt-3 justify-center flex-wrap">
+          <button class="btn btn-ok" id="keepHidden">Manter oculto</button>
+          <button class="btn btn-ghost" id="explainTrick">Entender o truque</button>
+        </div>
+      </div>
+    </div>
+  </article>
+  <div id="trickBox" class="card" hidden>
+    <p class="font-bold t-warn"><span class="sem">⚠ </span>Como o truque funciona</p>
+    <ul class="text-sm mt-2 list-disc pl-5 space-y-1">
+      <li><strong>Urgência falsa:</strong> “hoje às 22h” cria pressa para você não pensar.</li>
+      <li><strong>Prova social inventada:</strong> “3.200 já lucraram” — número sem fonte, impossível de verificar.</li>
+      <li><strong>“Falha no algoritmo”:</strong> jogos de azar são aleatórios; não existe falha previsível.</li>
+    </ul>
+  </div>
+
+  <!-- Checador de promessas -->
+  <div class="card">
+    <label for="promiseInput" class="font-bold">🔎 Checador de Promessas</label>
+    <textarea id="promiseInput" rows="3" class="w-full mt-2 rounded-lg p-2 text-sm" style="background:var(--bg);color:var(--text);border:1px solid var(--border)"
+      placeholder="Cole aqui uma mensagem suspeita…"></textarea>
+    <div class="flex gap-2 mt-2 flex-wrap">
+      <button class="btn btn-ok" id="checkBtn">Analisar</button>
+      <button class="btn btn-ghost" id="sampleBtn">Usar exemplo</button>
+    </div>
+    <div id="checkOut" class="mt-3 text-sm" aria-live="polite"></div>
+  </div>
+
+  <!-- Painel de desintoxicação visual -->
+  <div class="card">
+    <p class="font-bold">📉 Desintoxicação Visual</p>
+    <p class="muted text-xs">Gatilhos vistos por semana (dados sintéticos)</p>
+    <div id="detox" class="flex items-end gap-3 h-32 mt-3" role="img" aria-label="Gráfico: gatilhos semanais caíram de 48 para 6"></div>
+    <p class="mt-2 text-sm"><span class="t-ok font-extrabold mono">−87,5%</span> de gatilhos (48 → 6). Você já ocultou <strong id="blockedCount" class="mono">0</strong> nesta sessão.</p>
+  </div>
+</section>
+
+<!-- ================= TELA 2 — CAVALO DE TROIA ================= -->
+<section id="s2" class="screen space-y-4" hidden aria-labelledby="h2t">
+  <div id="s2inner" class="space-y-4">
+    <h2 id="h2t">🐴 Interceptador</h2>
+    <p class="muted text-sm">Bateu a vontade? Dois toques: escolha o valor e toque no botão.</p>
+    <div class="flex gap-2 justify-center" role="group" aria-label="Valor da ficha">
+      <button class="chip" data-chip="20" aria-pressed="false">R$ 20</button>
+      <button class="chip" data-chip="50" aria-pressed="false">R$ 50</button>
+      <button class="chip" data-chip="100" aria-pressed="true">R$ 100</button>
+    </div>
+    <button id="greenBtn" class="btn btn-ok pulse w-full text-lg py-4">[ BUSCAR O GREEN AGORA ]</button>
+  </div>
+
+  <div id="mathPanel" class="card space-y-3" hidden aria-live="polite">
+    <p class="font-extrabold text-lg t-warn"><span class="sem">⚠ </span>A Matemática que a Banca Esconde de Você</p>
+    <p class="text-sm muted">Cenário: <strong id="mChip" class="mono">R$ 100</strong> por impulso, 3× por semana, 48 semanas ativas.</p>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="rounded-xl p-3" style="border:2px solid var(--err)">
+        <p class="text-xs muted"><span class="sem">✖ </span>Drenado pela casa / ano</p>
+        <p id="mDrain" class="mono font-bold text-xl t-err">R$ 14.400,00</p>
+      </div>
+      <div class="rounded-xl p-3" style="border:2px solid var(--ok)">
+        <p class="text-xs muted"><span class="sem">✔ </span>Juros seguros se guardar</p>
+        <p id="mYield" class="mono font-bold text-xl t-ok">R$ 980,00</p>
+      </div>
+    </div>
+    <p class="text-xs muted">Simulação ilustrativa com taxa fixa de rendimento (≈ 6,8% sobre o total no período). Não é promessa de rentabilidade.</p>
+    <div class="flex gap-2 flex-wrap">
+      <button id="saveImpulse" class="btn btn-ok flex-1">Guardar na reserva agora</button>
+      <button id="closeMath" class="btn btn-ghost">Voltar</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TELA 3 — SENTINELA OPEN FINANCE ================= -->
+<section id="s3" class="screen space-y-4" hidden aria-labelledby="h3">
+  <h2 id="h3">🔭 Sentinela Open Finance</h2>
+  <div class="card">
+    <p class="text-xs muted">Extrato sintético (dados fictícios)</p>
+    <ul id="extrato" class="divide-y mt-2" style="border-color:var(--border)"></ul>
+  </div>
+  <div class="card">
+    <p class="text-sm"><span class="t-warn font-bold"><span class="sem">⚠ </span>Padrão detectado:</span> 3 Pix para intermediadora de iGaming fictícia em 14 dias — <strong class="mono">R$ 250,00</strong>.</p>
+    <p class="text-sm mt-1">Meta da semana na reserva: <strong id="goalSaved" class="mono">R$ 0,00</strong></p>
+  </div>
+  <button id="simPix" class="btn btn-warn w-full">⚡ Simular Tentativa Pix Quarta 21h30</button>
+</section>
+
+<!-- ================= TELA 4 — ARENA DO FÔLEGO ================= -->
+<section id="s4" class="screen space-y-4" hidden aria-labelledby="h4">
+  <h2 id="h4">🚀 Arena do Fôlego</h2>
+  <p class="muted text-sm">O foguete que nunca explode: segure para subir. Soltar só pausa — você nunca perde.</p>
+  <div id="track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Altitude do patrimônio">
+    <div id="rocket" aria-hidden="true">🚀</div>
+    <div class="absolute top-2 right-3 mono font-bold" id="altPct">0%</div>
+  </div>
+  <button id="holdBtn" class="btn btn-ok w-full py-4 text-base">SEGURE PARA DECOLAR SEU PATRIMÔNIO</button>
+  <div class="grid grid-cols-3 gap-2 text-center">
+    <div class="card"><p class="text-xs muted">Combo</p><p class="mono font-bold text-xl" id="streak">0</p></div>
+    <div class="card"><p class="text-xs muted">Preservado</p><p class="mono font-bold text-lg t-ok" id="savedTotal">R$ 0</p></div>
+    <div class="card"><p class="text-xs muted">Sessão</p><p class="mono font-bold text-xl" id="boosts">0</p></div>
+  </div>
+
+  <div class="card space-y-3">
+    <p class="font-bold">🎯 Meu Rolê que Rende</p>
+    <div id="goals" class="space-y-3"></div>
+  </div>
+
+  <div class="card">
+    <p class="font-bold">🃏 Cartas de Sabedoria</p>
+    <div id="cards" class="grid gap-2 mt-2"></div>
+  </div>
+</section>
+
+<!-- ================= TELA 5 — ACOLHIMENTO ================= -->
+<section id="s5" class="screen space-y-4" hidden aria-labelledby="h5">
+  <h2 id="h5">💬 Papo Reto IA</h2>
+  <div id="emergency" class="card" hidden role="alert" style="border:2px solid var(--err)">
+    <p class="font-extrabold t-err"><span class="sem">✖ </span>Você não está sozinho(a). Fale com alguém agora.</p>
+    <div class="flex gap-2 mt-2 flex-wrap">
+      <a class="btn btn-err flex-1 text-center" href="tel:188">📞 Ligar CVV 188 (24h)</a>
+      <a class="btn btn-warn flex-1 text-center" href="tel:136">🏥 CAPS/SUS — 136</a>
+    </div>
+    <p class="text-xs muted mt-2">Em risco imediato, ligue 192 (SAMU).</p>
+  </div>
+
+  <div id="chat" class="card flex flex-col gap-2 overflow-y-auto" style="height:260px" aria-live="polite">
+    <div class="bubble b-bot">Oi! Eu sou o Papo Reto, um apoio complementar — não sou terapeuta nem substituo atendimento profissional. Como você está agora?</div>
+  </div>
+  <div class="grid grid-cols-2 gap-2">
+    <button class="btn btn-ghost text-sm" data-quick="vontade">Bateu vontade de jogar</button>
+    <button class="btn btn-ghost text-sm" data-quick="desabafar">Quero desabafar sem julgamento</button>
+    <button class="btn btn-ghost text-sm" data-quick="contas">Dica para organizar contas da semana</button>
+    <button class="btn btn-ghost text-sm" data-quick="familia">Como conversar com a família</button>
+  </div>
+  <form id="chatForm" class="flex gap-2">
+    <input id="chatInput" class="flex-1 rounded-lg px-3" style="background:var(--surface);color:var(--text);border:1px solid var(--border);min-height:44px" placeholder="Escreva aqui…" aria-label="Mensagem" autocomplete="off">
+    <button class="btn btn-ok" type="submit">Enviar</button>
+  </form>
+
+  <div class="card text-center">
+    <p class="font-bold">🫁 Regulação Fisiológica (90s)</p>
+    <div id="breathCircle" aria-live="polite">Pronto</div>
+    <p id="breathInfo" class="text-sm muted">4s inspira · 4s segura · 6s solta</p>
+    <button id="breathBtn" class="btn btn-ok mt-2">Iniciar respiração</button>
+  </div>
+
+  <div class="card">
+    <p class="font-bold">⏱️ Micro-ações para os próximos 30 minutos</p>
+    <div id="micro" class="flex flex-wrap gap-2 mt-2" role="group"></div>
+    <p id="microOut" class="text-sm t-ok mt-2" aria-live="polite"></p>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== Navegação inferior ===== -->
+<nav id="nav" aria-label="Navegação principal">
+  <button class="navbtn" data-go="1"><span class="ic">🛡️</span>Feed</button>
+  <button class="navbtn" data-go="2"><span class="ic">🐴</span>Intercepta</button>
+  <button class="navbtn" data-go="3"><span class="ic">🔭</span>Sentinela</button>
+  <button class="navbtn" data-go="4"><span class="ic">🚀</span>Arena</button>
+  <button class="navbtn" data-go="5"><span class="ic">💬</span>Apoio</button>
+</nav>
+
+<!-- Modal de intervenção -->
+<div id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mdTitle">
+  <div class="card space-y-3" style="max-width:380px">
+    <p id="mdTitle" class="font-extrabold text-lg t-ok">🤝 Vamos pausar juntos?</p>
+    <p class="text-sm">Percebemos uma tentativa de Pix de <strong class="mono">R$ 100,00</strong> para uma intermediadora de jogos, numa janela que costuma ser de risco. Que tal respirar um instante e mandar esses R$ 100 para a sua meta da semana?</p>
+    <div class="flex flex-col gap-2">
+      <button id="mdRedirect" class="btn btn-ok">Redirecionar R$ 100 para a meta</button>
+      <button id="mdBreath" class="btn btn-ghost">Respirar 90s primeiro</button>
+      <button id="mdClose" class="btn btn-ghost">Fechar</button>
+    </div>
+    <p class="text-xs muted">Precisa conversar? <a class="underline" href="tel:188">CVV 188</a> · <a class="underline" href="tel:136">CAPS/SUS 136</a></p>
+  </div>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+/* ============ Store global (Pub/Sub) ============ */
+const Store = (() => {
+  let state = { screen: 1, saved: 0, streak: 0, boosts: 0, blocked: 0, selChip: 100, cardsUnlocked: 0, txExtra: [] };
+  const subs = new Set();
+  return {
+    get: () => state,
+    set(patch) { state = { ...state, ...patch }; subs.forEach(fn => fn(state)); },
+    subscribe(fn) { subs.add(fn); fn(state); return () => subs.delete(fn); }
+  };
+})();
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const brl = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ============ Acessibilidade ============ */
+function togglePress(btn, cls, on) {
+  document.documentElement.classList.toggle(cls, on);
+  btn.setAttribute('aria-pressed', String(on));
+}
+$('#btnFont').onclick = e => togglePress(e.currentTarget, 'big', !document.documentElement.classList.contains('big'));
+$('#btnContrast').onclick = e => togglePress(e.currentTarget, 'hc', !document.documentElement.classList.contains('hc'));
+$('#btnColor').onclick = e => togglePress(e.currentTarget, 'cb', !document.documentElement.classList.contains('cb'));
+$('#btnVoice').onclick = e => {
+  const btn = e.currentTarget;
+  if (!('speechSynthesis' in window)) { toast('Leitor de voz não suportado neste navegador.'); return; }
+  if (speechSynthesis.speaking) { speechSynthesis.cancel(); btn.setAttribute('aria-pressed', 'false'); return; }
+  const txt = $('#s' + Store.get().screen).innerText;
+  const u = new SpeechSynthesisUtterance(txt);
+  u.lang = 'pt-BR';
+  u.onend = u.onerror = () => btn.setAttribute('aria-pressed', 'false');
+  btn.setAttribute('aria-pressed', 'true');
+  window.speechSynthesis.speak(u);
+};
+
+/* ============ Navegação ============ */
+$$('[data-go]').forEach(b => b.onclick = () => { if ('speechSynthesis' in window) speechSynthesis.cancel(); Store.set({ screen: +b.dataset.go }); window.scrollTo({ top: 0 }); });
+Store.subscribe(s => {
+  $$('.screen').forEach((el, i) => el.hidden = (i + 1 !== s.screen));
+  $$('.navbtn').forEach(b => b.toggleAttribute('aria-current', +b.dataset.go === s.screen) || b.removeAttribute('aria-current'));
+  $$('.navbtn').forEach(b => { if (+b.dataset.go === s.screen) b.setAttribute('aria-current', 'page'); });
+});
+
+/* ============ TELA 1 ============ */
+$('#keepHidden').onclick = () => { Store.set({ blocked: Store.get().blocked + 1 }); toast('Post mantido oculto. 🛡️'); };
+$('#explainTrick').onclick = () => { $('#trickBox').hidden = false; $('#post1').classList.add('revealed'); };
+Store.subscribe(s => $('#blockedCount').textContent = s.blocked);
+
+(function detox() {
+  const vals = [48, 31, 19, 11, 6];
+  $('#detox').innerHTML = vals.map((v, i) =>
+    `<div class="flex-1 flex flex-col items-center justify-end h-full"><span class="mono text-xs">${v}</span><div class="bar w-full" style="height:${v / 48 * 100}%"></div><span class="text-xs muted">S${i + 1}</span></div>`).join('');
+})();
+
+const TRIGGERS = [
+  { name: 'Urgência artificial', re: /(hoje|agora|últimas? vagas?|só até|antes que|corre|\d+h\b|acaba)/i, tip: 'Pressa impede análise. Golpes e jogos de risco dependem de decisão rápida.' },
+  { name: 'Falsa prova social', re: /(todo mundo|milhares|mil pessoas|\d+\s*(pessoas|seguidores|alunos)|já lucraram|já ganharam|depoimento)/i, tip: 'Números sem fonte verificável são enfeite, não evidência.' },
+  { name: 'Garantia de ganho', re: /(garantid|100%|sem risco|lucro certo|ganho fácil|dinheiro fácil|não tem como perder)/i, tip: 'Nenhum jogo de azar garante lucro: a margem é da casa.' },
+  { name: 'Falsa autoridade / segredo', re: /(falha|algoritmo|método secreto|insider|sinal|vazou|estratégia exclusiva)/i, tip: 'Resultados aleatórios não têm “falha” previsível.' },
+  { name: 'Isca de exclusividade (FOMO)', re: /(vip|grupo exclusivo|convite|bônus|cashback|depósito)/i, tip: 'Exclusividade é gancho para te manter dentro e depositando.' }
+];
+function analyze() {
+  const txt = $('#promiseInput').value.trim(), out = $('#checkOut');
+  if (!txt) { out.textContent = 'Cole uma mensagem para analisar.'; return; }
+  out.textContent = 'Analisando…';
+  setTimeout(() => {
+    const hits = TRIGGERS.filter(t => t.re.test(txt));
+    out.innerHTML = '';
+    const head = document.createElement('p');
+    head.className = 'font-bold ' + (hits.length >= 2 ? 't-err' : hits.length ? 't-warn' : 't-ok');
+    head.textContent = hits.length
+      ? (hits.length >= 2 ? '✖ ' : '⚠ ') + hits.length + ' gatilho(s) de manipulação encontrado(s)'
+      : '✔ Nenhum gatilho típico encontrado — mesmo assim, desconfie de ganhos fáceis.';
+    out.appendChild(head);
+    hits.forEach(h => {
+      const d = document.createElement('div'); d.className = 'mt-2';
+      const b = document.createElement('strong'); b.textContent = h.name;
+      const p = document.createElement('p'); p.className = 'muted'; p.textContent = h.tip;
+      d.append(b, p); out.appendChild(d);
+    });
+  }, 900); // bem abaixo dos 5s prometidos
+}
+$('#checkBtn').onclick = analyze;
+$('#sampleBtn').onclick = () => { $('#promiseInput').value = 'Falha no algoritmo hoje às 22h! Mais de 3.000 pessoas já lucraram, ganho garantido sem risco. Entra no grupo VIP!'; analyze(); };
+
+/* ============ TELA 2 ============ */
+const SELECT_YIELD = 980 / 14400; // calibra o cenário de R$100 para R$980 de juros ilustrativos
+$$('[data-chip]').forEach(c => c.onclick = () => Store.set({ selChip: +c.dataset.chip }));
+Store.subscribe(s => $$('[data-chip]').forEach(c => c.setAttribute('aria-pressed', String(+c.dataset.chip === s.selChip))));
+$('#greenBtn').onclick = () => {
+  const box = $('#s2inner'); box.classList.add('glitching');
+  setTimeout(() => {
+    box.classList.remove('glitching');
+    const v = Store.get().selChip, drain = v * 3 * 48, yld = Math.round(drain * SELECT_YIELD);
+    $('#mChip').textContent = brl(v); $('#mDrain').textContent = brl(drain); $('#mYield').textContent = brl(yld);
+    $('#mathPanel').hidden = false; box.hidden = true;
+  }, 600);
+};
+$('#closeMath').onclick = () => { $('#mathPanel').hidden = true; $('#s2inner').hidden = false; };
+$('#saveImpulse').onclick = () => {
+  const v = Store.get().selChip; Store.set({ saved: Store.get().saved + v });
+  toast(`${brl(v)} guardados na reserva. Boa escolha! ✔`);
+  $('#closeMath').click();
+};
+
+/* ============ TELA 3 ============ */
+const BASE_TX = [
+  { d: '27/10', n: 'Supermercado Boa Compra', v: -187.40 },
+  { d: '26/10', n: 'PAGAMENTOS RAPIDOS IGAMING LTDA', v: -100, flag: true },
+  { d: '24/10', n: 'Salário — Empresa Exemplo S.A.', v: 2850 },
+  { d: '23/10', n: 'PAGAMENTOS RAPIDOS IGAMING LTDA', v: -50, flag: true },
+  { d: '21/10', n: 'PAGAMENTOS RAPIDOS IGAMING LTDA', v: -100, flag: true }
+];
+Store.subscribe(s => {
+  const rows = [...s.txExtra, ...BASE_TX];
+  $('#extrato').innerHTML = '';
+  rows.forEach(t => {
+    const li = document.createElement('li'); li.className = 'py-2 flex justify-between gap-2 text-sm';
+    const l = document.createElement('div');
+    l.textContent = `${t.d} · ${t.n}`;
+    if (t.flag) { const f = document.createElement('div'); f.className = 't-warn text-xs'; f.textContent = '⚠ Intermediadora de iGaming'; l.appendChild(f); }
+    if (t.ok) { const f = document.createElement('div'); f.className = 't-ok text-xs'; f.textContent = '✔ Redirecionado para a meta'; l.appendChild(f); }
+    const r = document.createElement('div'); r.className = 'mono font-bold ' + (t.v < 0 ? 't-err' : 't-ok'); r.textContent = brl(t.v);
+    li.append(l, r); $('#extrato').appendChild(li);
+  });
+  $('#goalSaved').textContent = brl(s.saved);
+});
+$('#simPix').onclick = () => { $('#modal').hidden = false; $('#mdRedirect').focus(); };
+$('#mdClose').onclick = () => { $('#modal').hidden = true; };
+$('#mdRedirect').onclick = () => {
+  const s = Store.get();
+  Store.set({ saved: s.saved + 100, txExtra: [{ d: 'Hoje', n: 'Meta da semana (Reserva)', v: 100, ok: true }, ...s.txExtra] });
+  $('#modal').hidden = true; toast('R$ 100,00 redirecionados para a sua meta. ✔');
+};
+$('#mdBreath').onclick = () => { $('#modal').hidden = true; Store.set({ screen: 5 }); setTimeout(startBreath, 150); };
+
+/* ============ TELA 4 — Hold-to-Boost ============ */
+const GOALS = [
+  { n: '🛒 Mercado da Semana', need: 100 },
+  { n: '🌳 Domingo no Parque com o Filho', need: 160 },
+  { n: '📘 Curso que eu queria fazer', need: 300 }
+];
+const WISDOM = [
+  'A casa sempre tem vantagem: a margem é matemática, não sorte.',
+  'O “quase ganhou” é desenhado: o cérebro lê quase-vitória como progresso.',
+  'Perseguir perdas costuma aumentar perdas. Parar cedo é estratégia.',
+  'Uma reserva de 1 mês já reduz a pressão de “resolver tudo num lance”.',
+  'Pedir ajuda cedo é força. CVV 188, 24h, gratuito.'
+];
+let progress = 0, holding = false, last = 0, raf = 0;
+function frame(ts) {
+  const dt = last ? ts - last : 0; last = ts;
+  if (holding) progress = Math.min(100, progress + dt / 4000 * 100); // 4s de segurar para chegar a 100%
+  renderRocket();
+  if (progress >= 100) { complete(); return; }
+  raf = requestAnimationFrame(frame);
+}
+function renderRocket() {
+  $('#rocket').style.bottom = (progress * 0.80) + '%';
+  $('#altPct').textContent = Math.floor(progress) + '%';
+  $('#track').setAttribute('aria-valuenow', Math.floor(progress));
+}
+function startHold() { if (holding) return; holding = true; last = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); }
+function endHold() { holding = false; }
+function complete() {
+  holding = false; cancelAnimationFrame(raf);
+  const s = Store.get(), streak = s.streak + 1;
+  Store.set({ streak, boosts: s.boosts + 1, saved: s.saved + 20, cardsUnlocked: Math.min(WISDOM.length, Math.max(s.cardsUnlocked, streak)) });
+  toast(`🚀 Órbita! +R$ 20 preservados · Combo ${streak}`);
+  setTimeout(() => { progress = 0; renderRocket(); }, 900);
+}
+const hb = $('#holdBtn');
+['pointerdown'].forEach(ev => hb.addEventListener(ev, e => { e.preventDefault(); startHold(); }));
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => hb.addEventListener(ev, endHold));
+hb.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); startHold(); } });
+hb.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') endHold(); });
+
+Store.subscribe(s => {
+  $('#streak').textContent = s.streak; $('#boosts').textContent = s.boosts; $('#savedTotal').textContent = brl(s.saved);
+  $('#goals').innerHTML = GOALS.map(g => {
+    const pct = Math.min(100, Math.round(s.saved / g.need * 100)), done = pct >= 100;
+    return `<div><div class="flex justify-between text-sm"><span>${g.n}</span><span class="mono ${done ? 't-ok' : 'muted'}">${done ? '✔ 100% quitado' : pct + '%'}</span></div>
+      <div class="h-2 rounded-full mt-1" style="background:var(--bg);border:1px solid var(--border)"><div class="h-full rounded-full" style="width:${pct}%;background:var(--ok)"></div></div></div>`;
+  }).join('');
+  $('#cards').innerHTML = WISDOM.map((w, i) => i < s.cardsUnlocked
+    ? `<div class="rounded-lg p-3 text-sm" style="border:1px solid var(--ok)"><span class="t-ok">✔ Carta ${i + 1}</span><br>${w}</div>`
+    : `<div class="rounded-lg p-3 text-sm muted" style="border:1px dashed var(--border)">🔒 Carta ${i + 1} — complete o combo ${i + 1}</div>`).join('');
+});
+
+/* ============ TELA 5 ============ */
+const chat = $('#chat');
+function say(txt, me) { const b = document.createElement('div'); b.className = 'bubble ' + (me ? 'b-me' : 'b-bot'); b.textContent = txt; chat.appendChild(b); chat.scrollTop = chat.scrollHeight; }
+const REPLIES = {
+  vontade: 'Obrigado por avisar — isso já é um passo forte. A vontade costuma ter pico de uns 15 a 20 minutos e depois cai. Vamos atravessar essa onda: respiração guiada aqui embaixo e uma micro-ação de 30 min. Quer começar pela respiração?',
+  desabafar: 'Estou aqui, sem julgamento. Pode escrever do jeito que vier. Se quiser, comece por: o que aconteceu hoje que pesou mais?',
+  contas: 'Um jeito simples: 1) liste só o que vence nos próximos 7 dias; 2) separe primeiro aluguel, comida e transporte; 3) o que sobrar vai para a meta da semana ANTES de qualquer lazer. Quer que eu monte isso com você?',
+  familia: 'Comece pelo sentimento, não pelo valor: “Tenho me sentido pressionado(a) e quero a sua ajuda”. Escolha um momento calmo, fale em primeira pessoa e peça uma coisa concreta (ex.: acompanhar as contas juntos). Quer ensaiar a primeira frase?',
+  padrao: 'Entendi. Obrigado por compartilhar. Quer me contar mais, ou prefere tentar a respiração guiada agora? Se sentir que precisa de uma pessoa, o CVV (188) atende 24h.'
+};
+const CRISIS = /(me matar|suic[ií]d|acabar com (tudo|a minha vida)|n[aã]o quero (mais )?viver|n[aã]o aguento mais|quero morrer|sumir do mundo|tirar minha vida)/i;
+function userSend(txt, key) {
+  say(txt, true);
+  if (CRISIS.test(txt)) {
+    $('#emergency').hidden = false; $('#emergency').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => say('Sinto muito que esteja tão difícil. Você importa. Por favor, fale agora com o CVV (188, 24h) ou procure o CAPS/SUS — os botões acima ligam com um toque. Eu fico aqui com você.'), 400);
+    return;
+  }
+  setTimeout(() => say(REPLIES[key] || REPLIES.padrao), 600);
+}
+$$('[data-quick]').forEach(b => b.onclick = () => userSend(b.textContent, b.dataset.quick));
+$('#chatForm').onsubmit = e => { e.preventDefault(); const v = $('#chatInput').value.trim(); if (!v) return; $('#chatInput').value = ''; userSend(v); };
+
+/* Respiração guiada: 90s, ciclo 4-4-6 */
+let breathTimer = null, breathOn = false;
+function stopBreath(msg) {
+  clearInterval(breathTimer); breathOn = false;
+  const c = $('#breathCircle'); c.style.transition = 'transform 1s'; c.style.transform = 'scale(1)'; c.textContent = msg || 'Pronto';
+  $('#breathBtn').textContent = 'Iniciar respiração';
+}
+function startBreath() {
+  if (breathOn) { stopBreath(); return; }
+  breathOn = true; $('#breathBtn').textContent = 'Parar';
+  const c = $('#breathCircle'), t0 = performance.now(); let phase = '';
+  breathTimer = setInterval(() => {
+    const el = (performance.now() - t0) / 1000;
+    if (el >= 90) { stopBreath('Concluído ✔'); $('#breathInfo').textContent = 'Muito bem. Como você está agora?'; return; }
+    const p = el % 14, left = Math.ceil(90 - el);
+    let ph = p < 4 ? 'Inspire' : p < 8 ? 'Segure' : 'Solte';
+    if (ph !== phase) {
+      phase = ph;
+      c.style.transition = `transform ${ph === 'Inspire' ? 4 : ph === 'Solte' ? 6 : 0.2}s ease-in-out`;
+      if (ph === 'Inspire') c.style.transform = 'scale(1.5)';
+      if (ph === 'Solte') c.style.transform = 'scale(1)';
+    }
+    c.textContent = ph;
+    $('#breathInfo').textContent = `Restam ${left}s · 4s inspira · 4s segura · 6s solta`;
+  }, 200);
+}
+$('#breathBtn').onclick = startBreath;
+
+const MICRO = ['💧 Beber um copo d’água', '🚶 Caminhar 10 min', '📞 Ligar para alguém de confiança', '🧹 Arrumar um canto da casa', '🎵 Ouvir uma música calma'];
+MICRO.forEach(m => {
+  const b = document.createElement('button'); b.className = 'chip'; b.type = 'button'; b.setAttribute('aria-pressed', 'false'); b.textContent = m;
+  b.onclick = () => { $$('#micro .chip').forEach(x => x.setAttribute('aria-pressed', 'false')); b.setAttribute('aria-pressed', 'true'); $('#microOut').textContent = `✔ Combinado: ${m} pelos próximos 30 minutos. Volto aqui com você depois.`; };
+  $('#micro').appendChild(b);
+});
+
+/* Fecha modal com Esc */
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#modal').hidden = true; });
+</script>
+</body>
+</html>
